@@ -11,7 +11,7 @@ Here are the requirements:
 
    Example invocation
    ```
-   python FlexiFlight.py "Help me find round‑trip flights from Ottawa that visit both France and Italy, in either order, with one week in each country, before returning to Ottawa."
+   python Flexiflight.py "Help me find round‑trip flights from Ottawa that visit both France and Italy, in either order, with one week in each country, before returning to Ottawa."
    ```
 
    The agent must be able to interpret and reason over the following types of flexible requirements:
@@ -86,4 +86,4 @@ Here are the requirements:
    - cli interface
    - pydantic
    - langgraph
-   - SerpAPI (google-search-results)
+   - SerpAPI (google-search-results): https://serpapi.com/google-flights-api
