@@ -1,6 +1,7 @@
 import requests
 import logging
 from typing import List, Dict, Any
+from langsmith import traceable
 
 logger = logging.getLogger(__name__)
 
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 VLLM_ENDPOINT = "http://localhost:8000/v1/chat/completions"
 DEFAULT_MODEL = "Qwen/Qwen3-1.7B"
 
-
+@traceable(run_type="llm")
 def call_vllm(messages: List[Dict[str, str]], model: str = DEFAULT_MODEL, timeout: int = 30, enable_thinking=False) -> str:
     """
     messages: [{"role": "user|system|assistant", "content": "..."} ...]
