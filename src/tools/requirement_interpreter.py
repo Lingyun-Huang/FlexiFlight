@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from pydantic import ValidationError
 
 from openai_llm import call_vllm
-from models.models import GoogleFlightsSearchParams, MultiCityFlightSegment
+from models.serp import GoogleFlightsSearchParams, MultiCityFlightSegment
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
