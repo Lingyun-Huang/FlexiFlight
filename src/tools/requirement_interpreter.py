@@ -12,7 +12,7 @@ from typing import List, Tuple, Optional, Dict, Any
 from datetime import datetime, timedelta
 from pydantic import ValidationError
 
-from llm import call_vllm
+from openai_llm import call_vllm
 from models.models import GoogleFlightsSearchParams, MultiCityFlightSegment
 
 logger = logging.getLogger(__name__)
@@ -22,45 +22,45 @@ logger.setLevel(logging.INFO)
 # Common IATA airport codes
 # Cities with multiple airports are mapped to comma-separated codes
 COMMON_AIRPORTS = {
-  "Toronto": "YYZ,YTZ",
-  "Montreal": "YUL,YHU",
-  "Vancouver": "YVR,YXX",
-  "Calgary": "YYC",
-  "Ottawa": "YOW",
-  "Edmonton": "YEG",
+  "toronto": "YYZ,YTZ",
+  "montreal": "YUL,YHU",
+  "vancouver": "YVR,YXX",
+  "calgary": "YYC",
+  "ottawa": "YOW",
+  "edmonton": "YEG",
 
-  "New York": "JFK,LGA,EWR",
-  "Los Angeles": "LAX,BUR,SNA,LGB,ONT",
-  "San Francisco": "SFO,OAK,SJC",
-  "Chicago": "ORD,MDW",
-  "Washington DC": "IAD,DCA,BWI",
-  "Miami": "MIA,FLL,PBI",
-  "Dallas": "DFW,DAL",
-  "Houston": "IAH,HOU",
-  "Boston": "BOS",
-  "Seattle": "SEA",
+  "new york": "JFK,LGA,EWR",
+  "los angeles": "LAX,BUR,SNA,LGB,ONT",
+  "san francisco": "SFO,OAK,SJC",
+  "chicago": "ORD,MDW",
+  "washington dc": "IAD,DCA,BWI",
+  "miami": "MIA,FLL,PBI",
+  "dallas": "DFW,DAL",
+  "houston": "IAH,HOU",
+  "boston": "BOS",
+  "seattle": "SEA",
 
-  "London": "LHR,LGW,STN,LTN,LCY,SEN",
-  "Paris": "CDG,ORY",
-  "Rome": "FCO,CIA",
-  "Milan": "MXP,LIN,BGY",
-  "Berlin": "BER",
-  "Amsterdam": "AMS",
-  "Frankfurt": "FRA",
-  "Munich": "MUC",
-  "Madrid": "MAD",
-  "Barcelona": "BCN",
+  "london": "LHR,LGW,STN,LTN,LCY,SEN",
+  "paris": "CDG,ORY",
+  "rome": "FCO,CIA",
+  "milan": "MXP,LIN,BGY",
+  "berlin": "BER",
+  "amsterdam": "AMS",
+  "frankfurt": "FRA",
+  "munich": "MUC",
+  "madrid": "MAD",
+  "barcelona": "BCN",
 
-  "Beijing": "PEK,PKX",
-  "Shanghai": "PVG,SHA",
-  "Guangzhou": "CAN",
-  "Shenzhen": "SZX",
-  "Chengdu": "CTU,TIA",
-  "Chongqing": "CKG",
-  "Wuhan": "WUH",
-  "Hong Kong": "HKG",
-  "Macau": "MFM",
-  "Taipei": "TPE,TSA"
+  "beijing": "PEK,PKX",
+  "shanghai": "PVG,SHA",
+  "guangzhou": "CAN",
+  "shenzhen": "SZX",
+  "chengdu": "CTU,TIA",
+  "chongqing": "CKG",
+  "wuhan": "WUH",
+  "hong kong": "HKG",
+  "macau": "MFM",
+  "taipei": "TPE,TSA"
 }
 
 
@@ -71,6 +71,21 @@ def validate_iata_code(code: str) -> bool:
     code = code.upper().strip()
     return len(code) == 3 and code.isalpha()
 
+def cities_to_iatas(city_names: List[str]) -> Optional[str]:
+    """
+    Convert list of city names to IATA code(s) using lookup table or LLM.
+    Returns single code or comma-separated codes for cities with multiple airports.
+    """
+    if isinstance(city_names, list):
+        iata_codes = []
+        for city in city_names:
+            code = city_to_iata(city)
+            if not code:
+                return None
+            iata_codes.append(code)
+        return ','.join(iata_codes)
+    elif isinstance(city_names, str):
+        return city_to_iata(city_names)
 
 def city_to_iata(city_name: str) -> Optional[str]:
     """
@@ -95,13 +110,10 @@ def city_to_iata(city_name: str) -> Optional[str]:
 If the city has multiple major airports, return them all separated by commas.
 City/Airport: {city_name}
 
-Return ONLY IATA codes (uppercase, separated by comma if multiple), nothing else.
+Return ONLY airport IATA codes (uppercase, separated by comma if multiple), nothing else.
 Examples:
-- "Paris" -> CDG,ORY
-- "New York" -> JFK,LGA,EWR
-- "LAX" -> LAX
-- "Tokyo" -> NRT,HND
-- "London" -> LHR,LGW,STN,LCY,LTN
+- "New York": "JFK,LGA,EWR"
+
 
 If you cannot determine a valid IATA code, return "UNKNOWN"."""
         
@@ -360,23 +372,19 @@ def parse_user_input(user_input: str) -> Tuple[Optional[Dict[str, Any]], List[st
     errors = []
     
     try:
-        prompt = f"""You are a flight search intent parser. Analyze the user's flight request and extract the following information.
+        prompt = f"""Your task is to extract structured information from the user's request and output a VALID JSON object.
 
 User Request: {user_input}
 
-IMPORTANT NOTES:
-- For cities with multiple airports (e.g., New York, London, Paris), list ALL major airports separated by commas
-- Examples: "New York" -> "JFK,LGA,EWR", "London" -> "LHR,LGW,STN", "Paris" -> "CDG,ORY"
-- This allows searching across all airports in a city for better options
+You MUST output ONLY a JSON object with ALL of the following fields (use null when missing):
 
-Please provide the output as a valid JSON object with ONLY these fields (include all fields, use null for missing):
 - flight_type: "one_way", "round_trip", or "multi_city" (required)
-- departure_city: city name or airport code(s) for departure, separated by comma if multiple (required for one_way/round_trip)
-- arrival_city: city name or airport code(s) for arrival, separated by comma if multiple (required for one_way/round_trip)
-- outbound_date: date in YYYY-MM-DD format or relative date like "tomorrow", "next Monday" (required)
+- departure_city: city name for departure, separated by comma if multiple (required only for one_way/round_trip)
+- arrival_city: city name for arrival, separated by comma if multiple (required only for one_way/round_trip)
+- outbound_date: date in YYYY-MM-DD format or relative date like "tomorrow", "next Monday" (required only for one_way/round_trip)
 - return_date: date in YYYY-MM-DD format (only for round_trip)
-- multi_city_segments: list of segments ONLY for multi_city flights. Each segment has: departure, arrival, date, times (optional)
-- adults: number of adults (default 1)
+- multi_city_segments: list of segments ONLY for multi_city flights. Each segment has: departure, arrival, date, times (required only for multi_city)
+- adults: number of adults (default 1 if not specified)
 - children: number of children (default 0)
 - infants_in_seat: number of infants in seat (default 0)
 - infants_on_lap: number of infants on lap (default 0)
@@ -393,9 +401,23 @@ Please provide the output as a valid JSON object with ONLY these fields (include
 - hl: 2-letter language code (default "en")
 - currency: 3-letter currency code (default "CAD")
 
+IMPORTANT NOTES:
+1. Determine the flight_type first.
+   - If the user describes A→B only → one_way
+   - If the user describes A→B→A → round_trip
+   - If the user describes A→B→C, open‑jaw, stopovers, or multiple legs → multi_city
+
+2. For one_way and round_trip:
+   - departure_city, arrival_city, outbound_date are required.
+   - return_date is required ONLY for round_trip.
+
+3. For multi_city:
+   - multi_city_segments MUST be provided.
+   - departure_city, arrival_city, outbound_date, return_date should be null.
+
 Return ONLY valid JSON without any markdown, explanation, or extra text.
 Example output:
-{{"flight_type": "round_trip", "departure_city": "JFK,LGA,EWR", "arrival_city": "CDG,ORY", "outbound_date": "2025-06-15", "return_date": "2025-06-22", "adults": 2, "children": 0, "infants_in_seat": 0, "infants_on_lap": 0, "travel_class": null, "flexible_dates": false, "stops": null, "max_price": null, "bags": null, "exclude_airlines": null, "include_airlines": null, "outbound_times": null, "return_times": null, "multi_city_segments": null, "gl": "ca", "hl": "en", "currency": "CAD"}}"""
+{{"flight_type": "round_trip", "departure_city": "Ottawa", "arrival_city": "Tokyo", "outbound_date": "2025-06-15", "return_date": "2025-06-22", "adults": 2, "children": 0, "infants_in_seat": 0, "infants_on_lap": 0, "travel_class": null, "flexible_dates": false, "stops": null, "max_price": null, "bags": null, "exclude_airlines": null, "include_airlines": null, "outbound_times": null, "return_times": null, "multi_city_segments": null, "gl": "ca", "hl": "en", "currency": "CAD"}}"""
         
         response = call_vllm([{"role": "user", "content": prompt}], enable_thinking=False)
         
@@ -439,7 +461,7 @@ def interpret_user_requirements(user_input: str) -> Tuple[List[GoogleFlightsSear
     if not intent_data:
         all_errors.append("Failed to parse user requirements")
         return [], all_errors
-    
+    logger.info(f"intent_data: {intent_data}")
     # Step 2: Build flight search payload from intent and validate the payload
     search_params_list = build_search_params_from_intent(intent_data)
 
