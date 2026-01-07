@@ -12,7 +12,7 @@ from typing import List, Tuple, Optional, Dict, Any
 from datetime import datetime, timedelta
 from pydantic import ValidationError
 
-from openai_llm import call_vllm
+from clients.openai_llm import call_vllm
 from models.serp import GoogleFlightsSearchParams, MultiCityFlightSegment
 
 logger = logging.getLogger(__name__)
@@ -415,9 +415,13 @@ IMPORTANT NOTES:
    - multi_city_segments MUST be provided.
    - departure_city, arrival_city, outbound_date, return_date should be null.
 
+4. For outbound date and return date, if year or month is missing, consider today's date is """ + datetime.now().strftime("%Y-%m-%d") + \
+""", and always choose the **nearest future dates** that satisfy the user's description,
+
 Return ONLY valid JSON without any markdown, explanation, or extra text.
 Example output:
-{{"flight_type": "round_trip", "departure_city": "Ottawa", "arrival_city": "Tokyo", "outbound_date": "2025-06-15", "return_date": "2025-06-22", "adults": 2, "children": 0, "infants_in_seat": 0, "infants_on_lap": 0, "travel_class": null, "flexible_dates": false, "stops": null, "max_price": null, "bags": null, "exclude_airlines": null, "include_airlines": null, "outbound_times": null, "return_times": null, "multi_city_segments": null, "gl": "ca", "hl": "en", "currency": "CAD"}}"""
+{{"flight_type": "round_trip", "departure_city": "Ottawa", "arrival_city": "Tokyo", "outbound_date": "2025-06-15", "return_date": "2025-06-22", "adults": 2, "children": 0, "infants_in_seat": 0, "infants_on_lap": 0, "travel_class": null, "flexible_dates": false, "stops": null, "max_price": null, "bags": null, "exclude_airlines": null, "include_airlines": null, "outbound_times": null, "return_times": null, "multi_city_segments": null, "gl": "ca", "hl": "en", "currency": "CAD"}}
+"""
         
         response = call_vllm([{"role": "user", "content": prompt}], enable_thinking=False)
         
