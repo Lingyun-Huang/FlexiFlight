@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    volumes:
+      - huggingface_cache:/root/.cache/huggingface/hub
+    command: >
+      --model Qwen/Qwen3-1.7B
+      --max-model-len 8192
+      --gpu-memory-utilization 0.85
+
+  redis:
+    image: redis:latest
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+  redisinsight:
+    image: redis/redisinsight:latest
+    restart: unless-stopped
+    ports:
+      - "5540:5540"
+    depends_on:
+      - redis
+    volumes:
+      - redisinsight_data:/data
+
+volumes:
+  huggingface_cache:
+  redis_data:
+  redisinsight_data:
