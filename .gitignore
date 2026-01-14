@@ -1,0 +1,76 @@
+# ----------------------------
+# Python bytecode / cache
+# ----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ----------------------------
+# Virtual environments
+# ----------------------------
+.env
+.venv
+venv/
+ENV/
+env/
+
+# ----------------------------
+# Packaging / build artifacts
+# ----------------------------
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# ----------------------------
+# Installer logs
+# ----------------------------
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ----------------------------
+# Unit test / coverage reports
+# ----------------------------
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# ----------------------------
+# IDE / editor files
+# ----------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ----------------------------
+# OS-specific files
+# ----------------------------
+.DS_Store
+Thumbs.db
+
+# ----------------------------
+# Logs & runtime files
+# ----------------------------
+*.log
+
+# ----------------------------
+# Jupyter
+# ----------------------------
+.ipynb_checkpoints/
+
+# ----------------------------
+# mypy / type checker
+# ----------------------------
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ----------------------------
+# PyCharm
+# ----------------------------
+*.iml
